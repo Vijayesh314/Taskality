@@ -1,0 +1,37 @@
+{
+  "users": {
+    "5a6edf8d-f36e-4b5c-b4c4-1b8e6956c9b4": {
+      "level": 1,
+      "xp": 58,
+      "coins": 70,
+      "streak": 1,
+      "last_completed_date": "2025-11-08T13:04:34.919081",
+      "total_tasks_completed": 5,
+      "badges": [],
+      "avatar_customizations": [
+        "default",
+        "hat_1"
+      ]
+    }
+  },
+  "tasks": {
+    "abfc8797-7a42-483d-b2a5-1d06de50739a": {
+      "id": "abfc8797-7a42-483d-b2a5-1d06de50739a",
+      "user_id": "5a6edf8d-f36e-4b5c-b4c4-1b8e6956c9b4",
+      "title": "daily question",
+      "description": "what was going through ur mind when u decided to ask our arpita's mom instead of her daughter",
+      "recurring": true,
+      "frequency": "daily",
+      "scheduled_time": "21:00",
+      "xp_reward": 18,
+      "coin_reward": 50,
+      "completed": true,
+      "completed_dates": [
+        "2025-11-08"
+      ],
+      "created_at": "2025-11-08T13:04:27.651468",
+      "streak": 0
+    }
+  },
+  "achievements": {}
+}
