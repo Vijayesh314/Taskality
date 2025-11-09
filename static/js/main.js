@@ -5,6 +5,18 @@ const API_BASE = '';
 let userData = null;
 let tasks = [];
 
+// Shop items - must match backend
+const SHOP_ITEMS = {
+    'mountain_boots': { name: 'Mountain Boots', cost: 100, icon: 'fa-hiking', description: 'Sturdy boots for mountain climbing' },
+    'backpack': { name: 'Adventure Backpack', cost: 150, icon: 'fa-backpack', description: 'A spacious backpack for your journey' },
+    'compass': { name: 'Golden Compass', cost: 200, icon: 'fa-compass', description: 'Never lose your way' },
+    'rope': { name: 'Magic Rope', cost: 125, icon: 'fa-rope', description: 'Strong and lightweight climbing rope' },
+    'map': { name: 'Ancient Map', cost: 175, icon: 'fa-map', description: 'Reveals hidden mountain paths' },
+    'water_bottle': { name: 'Enchanted Water Bottle', cost: 100, icon: 'fa-bottle-water', description: 'Never runs empty' },
+    'first_aid': { name: 'Healer\'s Kit', cost: 150, icon: 'fa-briefcase-medical', description: 'For magical healing' },
+    'tent': { name: 'Cloud Tent', cost: 250, icon: 'fa-campground', description: 'A cozy shelter in the mountains' }
+};
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     loadUserData();
@@ -256,20 +268,13 @@ function updateShop() {
     if (!userData) return;
     
     const shopList = document.getElementById('shopList');
-    const shopItems = [
-        { id: 'hat_1', name: 'Wizard Hat', icon: '🎩', cost: 100 },
-        { id: 'hat_2', name: 'Crown', icon: '👑', cost: 200 },
-        { id: 'hat_3', name: 'Cap', icon: '🧢', cost: 150 },
-        { id: 'pet_1', name: 'Cat Companion', icon: '🐱', cost: 300 },
-        { id: 'pet_2', name: 'Dog Companion', icon: '🐶', cost: 300 },
-        { id: 'pet_3', name: 'Dragon', icon: '🐉', cost: 500 }
-    ];
     
-    shopList.innerHTML = shopItems.map(item => {
-        const unlocked = userData.avatar_customizations.includes(item.id);
+    shopList.innerHTML = Object.keys(SHOP_ITEMS).map(itemId => {
+        const item = SHOP_ITEMS[itemId];
+        const unlocked = userData.inventory && userData.inventory.includes(itemId);
         return `
-            <div class="shop-item ${unlocked ? 'unlocked' : ''}" onclick="${unlocked ? '' : `unlockItem('${item.id}', ${item.cost})`}">
-                <div class="shop-item-icon">${item.icon}</div>
+            <div class="shop-item ${unlocked ? 'unlocked' : ''}" onclick="${unlocked ? '' : `unlockItem('${itemId}', ${item.cost})`}">
+                <div class="shop-item-icon"><i class="fas ${item.icon}"></i></div>
                 <div class="shop-item-name">${item.name}</div>
                 <div class="shop-item-cost">${unlocked ? 'Unlocked ✓' : `💰 ${item.cost} Coins`}</div>
             </div>
