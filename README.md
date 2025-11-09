@@ -83,14 +83,12 @@ mountainhacks/
 
 ## Future Enhancements
 
-- Database integration (SQLite/PostgreSQL)
 - User authentication and multiple user support
 - Social features (share achievements, challenge friends)
 - More game mechanics (quests, challenges, leaderboards)
 - Mobile app version
 - More customization options
-- Daily/weekly challenges
+- Weekly challenges
 
 ## License
-
-This project is created for Mountain Hacks hackathon
+MIT License
