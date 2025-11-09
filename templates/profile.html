@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Mountain Tasks</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <nav class="navbar">
+            <a href="{{ url_for('index') }}" class="nav-link">
+                <i class="fas fa-home"></i> Home
+            </a>
+            <a href="{{ url_for('logout') }}" class="nav-link">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
+
+        <div class="profile-container">
+            <div class="profile-header">
+                <div class="profile-info">
+                    <h1>{{ username }}'s Profile</h1>
+                    <div class="stats-container">
+                        <div class="stat-card">
+                            <i class="fas fa-star"></i>
+                            <h3>Level</h3>
+                            <p>{{ user.level }}</p>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-coins"></i>
+                            <h3>Current Coins</h3>
+                            <p>{{ user.coins }}</p>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-trophy"></i>
+                            <h3>Total Earned</h3>
+                            <p>{{ total_coins_earned }}</p>
+                        </div>
+                        <div class="stat-card">
+                            <i class="fas fa-fire"></i>
+                            <h3>Streak</h3>
+                            <p>{{ user.streak }} days</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="inventory-section">
+                <h2><i class="fas fa-shopping-bag"></i> Your Items</h2>
+                {% if purchased_items %}
+                <div class="inventory-grid">
+                    {% for item in purchased_items %}
+                    <div class="inventory-item">
+                        <div class="item-icon">
+                            <i class="fas fa-{{ 'hiking' if item.id == 'mountain_boots' 
+                                              else 'backpack' if item.id == 'backpack'
+                                              else 'compass' if item.id == 'compass'
+                                              else 'rope' if item.id == 'rope'
+                                              else 'map' if item.id == 'map'
+                                              else 'bottle-water' if item.id == 'water_bottle'
+                                              else 'briefcase-medical' if item.id == 'first_aid'
+                                              else 'campground' if item.id == 'tent'
+                                              else 'box' }}"></i>
+                        </div>
+                        <div class="item-info">
+                            <h3>{{ item.name }}</h3>
+                            <p>{{ item.description }}</p>
+                            <span class="item-cost">
+                                <i class="fas fa-coins"></i> {{ item.cost }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-inventory">
+                    <i class="fas fa-box-open"></i>
+                    <p>You haven't purchased any items yet!</p>
+                    <p class="sub-text">Complete tasks to earn coins and unlock cool items!</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="achievements-section">
+                <h2><i class="fas fa-medal"></i> Achievements</h2>
+                <div class="badges-container">
+                    {% for badge in user.badges %}
+                    <div class="badge-item">
+                        <i class="fas fa-{{ 'fire' if 'streak' in badge else 'tasks' }}"></i>
+                        <span>{{ badge.replace('_', ' ').title() }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
