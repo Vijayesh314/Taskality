@@ -15,21 +15,19 @@
             {% if error %}
             <div class="error-message">{{ error }}</div>
             {% endif %}
-            <form method="POST" action="{{ url_for('register') }}" onsubmit="return validateForm()">
+            <form method="POST" action="{{ url_for('register') }}">
                 <div class="form-group">
-                    <label for="username">Username:</label>
-                    <input type="text" id="username" name="username" required minlength="3" pattern="[a-zA-Z0-9_-]+" title="Username can only contain letters, numbers, underscores and hyphens">
-                    <small class="form-hint">At least 3 characters, letters, numbers, and _ -</small>
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" required>
                 </div>
                 <div class="form-group">
                     <label for="password">Password:</label>
                     <input type="password" id="password" name="password" required minlength="6">
-                    <small class="form-hint">At least 6 characters</small>
+                    <span class="form-hint">Minimum 6 characters</span>
                 </div>
                 <div class="form-group">
                     <label for="confirm_password">Confirm Password:</label>
-                    <input type="password" id="confirm_password" name="confirm_password" required>
-                    <small class="form-hint password-match" id="password-match"></small>
+                    <input type="password" id="confirm_password" name="confirm_password" required minlength="6">
                 </div>
                 <button type="submit" class="btn btn-primary">Create Account</button>
             </form>
@@ -38,40 +36,5 @@
             </p>
         </div>
     </div>
-    
-    <script>
-        function validateForm() {
-            const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirm_password').value;
-            const matchHint = document.getElementById('password-match');
-            
-            if (password !== confirmPassword) {
-                matchHint.textContent = 'Passwords do not match!';
-                matchHint.classList.add('error');
-                return false;
-            }
-            return true;
-        }
-
-        document.getElementById('confirm_password').addEventListener('input', function() {
-            const password = document.getElementById('password').value;
-            const confirmPassword = this.value;
-            const matchHint = document.getElementById('password-match');
-            
-            if (confirmPassword) {
-                if (password === confirmPassword) {
-                    matchHint.textContent = 'Passwords match!';
-                    matchHint.classList.remove('error');
-                    matchHint.classList.add('success');
-                } else {
-                    matchHint.textContent = 'Passwords do not match!';
-                    matchHint.classList.remove('success');
-                    matchHint.classList.add('error');
-                }
-            } else {
-                matchHint.textContent = '';
-            }
-        });
-    </script>
 </body>
 </html>
