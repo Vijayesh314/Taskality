@@ -137,7 +137,7 @@ mountainhacks/
 
 ## Security Notes
 
-⚠️ **Important for Production**:
+**Important for Production**:
 - Change the `app.secret_key` in `app.py` to a secure random string
 - Consider using environment variables for sensitive configuration
 - For production, use a proper database (PostgreSQL, MySQL) instead of JSON files
