@@ -1,18 +1,34 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 import csv
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+import firebase_admin
+from firebase_admin import credentials, auth, db
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-in-production'
 
-# Data storage file
-DATA_FILE = 'user_data.json'
+app = Flask(__name__)
+app.secret_key = "supersecretkey" 
+app.permanent_session_lifetime = timedelta(days=7)
 
-# Define shop items (centralized)
+# Initialize Firebase Admin SDK
+cred = credentials.Certificate("serviceAccountKey.json") 
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://console.firebase.google.com/u/0/project/taskality/database/taskality-default-rtdb/data/~2F?fb_gclid=CjwKCAiAlMHIBhAcEiwAZhZBUnE-skS9gfU5Der_bNJHJb3IuiaGEnGWuVg3ILTmZutf6mkPSZ3ujBoCOKIQAvD_BwE'
+})
+
+DATA_FILE = 'user_data.json'
+UPLOAD_FOLDER = os.path.join('static', 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+# ensure upload folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 SHOP_ITEMS = {
     'mountain_boots': {'name': 'Mountain Boots', 'cost': 100, 'description': 'Sturdy boots for mountain climbing'},
     'backpack': {'name': 'Adventure Backpack', 'cost': 150, 'description': 'A spacious backpack for your journey'},
@@ -109,6 +125,36 @@ CHALLENGE_TEMPLATES = {
     }
 }
 
+# Admin endpoint to add custom challenge templates
+@app.route('/api/challenge-templates', methods=['POST'])
+def add_challenge_template():
+    """Add a custom challenge template (admin only)"""
+    # Simple admin check (replace with real auth in production)
+    if session.get('username') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    challenge_data = request.json
+    template_id = challenge_data.get('id')
+    if not template_id:
+        return jsonify({'error': 'Template ID required'}), 400
+    if template_id in CHALLENGE_TEMPLATES:
+        return jsonify({'error': 'Template ID already exists'}), 400
+
+    # Accept custom fields
+    CHALLENGE_TEMPLATES[template_id] = {
+        'name': challenge_data.get('name', 'Custom Challenge'),
+        'description': challenge_data.get('description', ''),
+        'difficulty': challenge_data.get('difficulty', 'easy'),
+        'tasks_required': challenge_data.get('tasks_required', 1),
+        'duration_hours': challenge_data.get('duration_hours', 24),
+        'xp_reward': challenge_data.get('xp_reward', 10),
+        'coin_reward': challenge_data.get('coin_reward', 5),
+        'icon': challenge_data.get('icon', '🎯'),
+        # Any extra fields
+        **{k: v for k, v in challenge_data.items() if k not in ['id','name','description','difficulty','tasks_required','duration_hours','xp_reward','coin_reward','icon']}
+    }
+    return jsonify({'message': 'Challenge template added!', 'template': CHALLENGE_TEMPLATES[template_id]})
+
 def load_data():
     """Load user data from JSON file"""
     if os.path.exists(DATA_FILE):
@@ -120,8 +166,14 @@ def load_data():
         'achievements': {},
         'quests': {},
         'challenges': {},
-        'quest_templates': {}
+        'quest_templates': {},
+        'social': {},
+        'pending_challenges': {}
     }
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def save_data(data):
     """Save user data to JSON file"""
@@ -178,6 +230,9 @@ def initialize_user(data, user_id):
         user['active_challenges'] = []
     if 'completed_challenges' not in user:
         user['completed_challenges'] = []
+    if 'theme' not in user:
+        # default theme for users
+        user['theme'] = 'light'
     return user
 
 @app.route('/')
@@ -187,79 +242,35 @@ def index():
         return redirect(url_for('login'))
     return render_template('index.html')
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def login():
-    """Login page"""
-    if request.method == 'POST':
-        username = request.form['username'].strip()
-        password = request.form['password']
-        
-        if not username or not password:
-            return render_template('login.html', error='Please fill in all fields')
-        
-        # Read CSV file
-        try:
-            with open('login_info.csv', 'r') as f:
-                reader = csv.DictReader(f)
-                for user in reader:
-                    if user['username'] == username and check_password_hash(user['password'], password):
-                        session['username'] = username
-                        session['user_id'] = str(uuid.uuid4())
-                        session['avatar'] = user['avatar']
-                        session['coins'] = int(user['coins'])
-                        return redirect(url_for('index'))
-            
-            return render_template('login.html', error='Invalid username or password')
-        except FileNotFoundError:
-            return render_template('login.html', error='System error. Please try again later.')
-    
-    return render_template('login.html')
+    if request.method == "POST":
+        email = request.form["email"]
+        password = request.form["password"]
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    """Register page"""
-    if request.method == 'POST':
-        username = request.form['username'].strip()
-        password = request.form['password']
-        confirm_password = request.form.get('confirm_password', '')
-        
-        # Validation
-        if not username or not password:
-            return render_template('register.html', error='Please fill in all fields')
-            
-        if len(username) < 3:
-            return render_template('register.html', error='Username must be at least 3 characters long')
-            
-        if len(password) < 6:
-            return render_template('register.html', error='Password must be at least 6 characters long')
-            
-        if password != confirm_password:
-            return render_template('register.html', error='Passwords do not match')
-        
         try:
-            # Check if username already exists
-            with open('login_info.csv', 'r') as f:
-                reader = csv.DictReader(f)
-                if any(user['username'] == username for user in reader):
-                    return render_template('register.html', error='Username already exists')
-            
-            # Hash password and add new user
-            hashed_password = generate_password_hash(password)
-            with open('login_info.csv', 'a', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow([username, hashed_password, 'default', 100, ''])  # Starting with 100 coins
-            
-            # Start session
-            session['username'] = username
-            session['user_id'] = str(uuid.uuid4())
-            session['avatar'] = 'default'
-            session['coins'] = 100
-            
-            return redirect(url_for('index'))
+            user = auth.get_user_by_email(email)
+            session.permanent = True
+            session["user"] = email
+            return redirect(url_for("dashboard"))
         except Exception as e:
-            return render_template('register.html', error='Registration failed. Please try again.')
-    
-    return render_template('register.html')
+            return render_template("login.html", error="Invalid login credentials or user not found.")
+
+    return render_template("login.html")
+
+@app.route("/register", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        email = request.form["email"]
+        password = request.form["password"]
+
+        try:
+            user = auth.create_user(email=email, password=password)
+            return redirect(url_for("login"))
+        except Exception as e:
+            return render_template("register.html", error=str(e))
+
+    return render_template("register.html")
 
 @app.route('/logout')
 def logout():
@@ -286,7 +297,10 @@ def create_task():
     
     task_data = request.json
     task_id = str(uuid.uuid4())
-    
+    # respect user defaults if client doesn't provide rewards
+    xp_reward = task_data.get('xp_reward') if task_data.get('xp_reward') is not None else user.get('default_xp_reward', 10)
+    coin_reward = task_data.get('coin_reward') if task_data.get('coin_reward') is not None else user.get('default_coin_reward', 5)
+
     new_task = {
         'id': task_id,
         'user_id': user_id,
@@ -295,8 +309,8 @@ def create_task():
         'recurring': task_data.get('recurring', False),
         'frequency': task_data.get('frequency', 'daily'),  # daily, weekly, custom
         'scheduled_time': task_data.get('scheduled_time', ''),
-        'xp_reward': task_data.get('xp_reward', 10),
-        'coin_reward': task_data.get('coin_reward', 5),
+        'xp_reward': xp_reward,
+        'coin_reward': coin_reward,
         'completed': False,
         'completed_dates': [],
         'created_at': datetime.now().isoformat(),
@@ -451,6 +465,100 @@ def get_user():
         'xp_progress': xp_progress,
         'xp_percentage': xp_percentage
     })
+
+
+@app.route('/api/theme', methods=['GET', 'POST'])
+def theme_api():
+    """Get or set theme preference. If logged in, persist to user data; otherwise use session."""
+    data = load_data()
+    user_id = get_user_id()
+    initialize_user(data, user_id)
+
+    if request.method == 'GET':
+        # return user's theme or session theme
+        user = data['users'].get(user_id, {})
+        theme = user.get('theme') or session.get('theme', 'light')
+        return jsonify({'theme': theme})
+
+    # POST: set theme
+    payload = request.json or {}
+    theme = payload.get('theme')
+    if not theme:
+        return jsonify({'error': 'theme required'}), 400
+
+    # persist
+    if user_id in data.get('users', {}):
+        data['users'][user_id]['theme'] = theme
+        save_data(data)
+
+    session['theme'] = theme
+    return jsonify({'message': 'Theme updated', 'theme': theme})
+
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def settings_api():
+    """Get or update user settings (default rewards, notifications)"""
+    data = load_data()
+    user_id = get_user_id()
+    user = initialize_user(data, user_id)
+
+    if request.method == 'GET':
+        settings = {
+            'default_xp_reward': user.get('default_xp_reward', 10),
+            'default_coin_reward': user.get('default_coin_reward', 5),
+            'notifications_enabled': user.get('notifications_enabled', True),
+            'avatar_url': user.get('avatar_url', session.get('avatar'))
+        }
+        return jsonify({'settings': settings})
+
+    # POST: update settings
+    payload = request.json or {}
+    try:
+        if 'default_xp_reward' in payload:
+            user['default_xp_reward'] = int(payload.get('default_xp_reward', 10))
+        if 'default_coin_reward' in payload:
+            user['default_coin_reward'] = int(payload.get('default_coin_reward', 5))
+        if 'notifications_enabled' in payload:
+            user['notifications_enabled'] = bool(payload.get('notifications_enabled'))
+
+        save_data(data)
+        return jsonify({'message': 'Settings updated', 'settings': {
+            'default_xp_reward': user.get('default_xp_reward'),
+            'default_coin_reward': user.get('default_coin_reward'),
+            'notifications_enabled': user.get('notifications_enabled'),
+            'avatar_url': user.get('avatar_url', session.get('avatar'))
+        }})
+    except Exception as e:
+        return jsonify({'error': 'Invalid settings payload'}), 400
+
+
+@app.route('/api/user/avatar', methods=['POST'])
+def upload_avatar():
+    """Upload avatar image for current user"""
+    if 'username' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    if file and allowed_file(file.filename):
+        filename = secure_filename(f"{get_user_id()}_{file.filename}")
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+
+        data = load_data()
+        user_id = get_user_id()
+        user = initialize_user(data, user_id)
+        user['avatar_url'] = url_for('static', filename=f'uploads/{filename}')
+        save_data(data)
+
+        return jsonify({'message': 'Avatar uploaded', 'avatar_url': user['avatar_url']})
+
+    return jsonify({'error': 'Invalid file type'}), 400
 
 @app.route('/api/user/unlock', methods=['POST'])
 def unlock_customization():
@@ -707,6 +815,174 @@ def get_challenge_templates():
     """Get available challenge templates"""
     return jsonify({'templates': CHALLENGE_TEMPLATES})
 
+
+# ============ SOCIAL / FRIEND CHALLENGES ============
+
+
+@app.route('/api/users', methods=['GET'])
+def list_users():
+    """Return a list of users (id, username)"""
+    data = load_data()
+    users = []
+    for uid, user in data.get('users', {}).items():
+        users.append({'id': uid, 'username': user.get('username', 'Player')})
+    return jsonify({'users': users})
+
+
+@app.route('/api/share-achievement', methods=['POST'])
+def share_achievement():
+    """Share an achievement to the social feed"""
+    if 'username' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = load_data()
+    user_id = get_user_id()
+    user = initialize_user(data, user_id)
+
+    payload = request.json
+    badge = payload.get('badge')
+    message = payload.get('message', '')
+
+    if not badge:
+        return jsonify({'error': 'Badge id required'}), 400
+
+    share_id = str(uuid.uuid4())
+    share = {
+        'id': share_id,
+        'user_id': user_id,
+        'username': session.get('username'),
+        'badge': badge,
+        'message': message,
+        'timestamp': datetime.now().isoformat()
+    }
+
+    if 'social' not in data:
+        data['social'] = {}
+    data['social'][share_id] = share
+    save_data(data)
+
+    return jsonify({'message': 'Achievement shared!', 'share': share})
+
+
+@app.route('/api/social-feed', methods=['GET'])
+def social_feed():
+    """Return recent shared achievements"""
+    data = load_data()
+    shares = list(data.get('social', {}).values())
+    # Sort by timestamp desc
+    shares.sort(key=lambda s: s.get('timestamp', ''), reverse=True)
+    return jsonify({'shares': shares})
+
+
+@app.route('/api/challenge-friend', methods=['POST'])
+def challenge_friend():
+    """Send a challenge invitation to a friend"""
+    if 'username' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = load_data()
+    user_id = get_user_id()
+    payload = request.json
+    friend_id = payload.get('friend_id')
+    template_id = payload.get('template_id', 'daily_grind')
+
+    if not friend_id:
+        return jsonify({'error': 'friend_id required'}), 400
+
+    if friend_id == user_id:
+        return jsonify({'error': 'Cannot challenge yourself'}), 400
+
+    # Validate friend exists
+    if friend_id not in data.get('users', {}):
+        return jsonify({'error': 'Friend not found'}), 404
+
+    if template_id not in CHALLENGE_TEMPLATES:
+        return jsonify({'error': 'Invalid challenge template'}), 400
+
+    pending_id = str(uuid.uuid4())
+    pending = {
+        'id': pending_id,
+        'from_user': user_id,
+        'from_username': session.get('username'),
+        'to_user': friend_id,
+        'template_id': template_id,
+        'created_at': datetime.now().isoformat(),
+        'status': 'pending'
+    }
+
+    if 'pending_challenges' not in data:
+        data['pending_challenges'] = {}
+    data['pending_challenges'][pending_id] = pending
+    save_data(data)
+
+    return jsonify({'message': 'Challenge sent!', 'pending': pending})
+
+
+@app.route('/api/pending-challenges', methods=['GET'])
+def get_pending_challenges():
+    """Get pending challenges for current user"""
+    data = load_data()
+    user_id = get_user_id()
+    pending = [p for p in data.get('pending_challenges', {}).values() if p.get('to_user') == user_id]
+    return jsonify({'pending': pending})
+
+
+@app.route('/api/pending-challenges/<pending_id>/respond', methods=['POST'])
+def respond_pending_challenge(pending_id):
+    """Accept or decline a pending challenge"""
+    if 'username' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = load_data()
+    user_id = get_user_id()
+
+    if pending_id not in data.get('pending_challenges', {}):
+        return jsonify({'error': 'Pending challenge not found'}), 404
+
+    pending = data['pending_challenges'][pending_id]
+    if pending.get('to_user') != user_id:
+        return jsonify({'error': 'Not your challenge to respond to'}), 403
+
+    payload = request.json
+    accept = bool(payload.get('accept', False))
+
+    pending['status'] = 'accepted' if accept else 'declined'
+    pending['responded_at'] = datetime.now().isoformat()
+
+    if accept:
+        # Create challenge for the accepting user
+        template_id = pending.get('template_id')
+        if template_id not in CHALLENGE_TEMPLATES:
+            save_data(data)
+            return jsonify({'error': 'Challenge template no longer available'}), 400
+
+        template = CHALLENGE_TEMPLATES[template_id]
+        challenge_id = str(uuid.uuid4())
+        new_challenge = {
+            'id': challenge_id,
+            'user_id': user_id,
+            'template_id': template_id,
+            'name': template['name'],
+            'description': template['description'],
+            'difficulty': template['difficulty'],
+            'icon': template.get('icon', '🎯'),
+            'started_at': datetime.now().isoformat(),
+            'progress': 0,
+            'completed': False,
+            'duration_hours': template['duration_hours'],
+            'xp_reward': template['xp_reward'],
+            'coin_reward': template['coin_reward'],
+            'metadata': {k: v for k, v in template.items() 
+                        if k not in ['name', 'description', 'difficulty', 'icon', 'xp_reward', 'coin_reward', 'duration_hours']}
+        }
+
+        if 'challenges' not in data:
+            data['challenges'] = {}
+        data['challenges'][challenge_id] = new_challenge
+
+    save_data(data)
+    return jsonify({'message': 'Response recorded', 'pending': pending})
+
 @app.route('/api/challenges', methods=['GET'])
 def get_challenges():
     """Get all challenges for current user"""
@@ -933,7 +1209,7 @@ def profile():
     user_id = get_user_id()
     user = initialize_user(data, user_id)
     
-    # Store username in user data
+    # Store username in user data 
     user['username'] = session['username']
     
     # Initialize inventory if doesn't exist
@@ -964,5 +1240,45 @@ def gamemechanics():
         return redirect(url_for('login'))
     return render_template('gamemechanics.html')
 
+@app.route('/calendar')
+def calendar():
+    """Calendar view for weekly/monthly task planning"""
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template('calendar.html')
+
+@app.route('/api/calendar/tasks')
+def get_calendar_tasks():
+    """Get tasks for calendar view with date range"""
+    data = load_data()
+    user_id = get_user_id()
+    initialize_user(data, user_id)
+    
+    # Get date range from query params (default: current month)
+    try:
+        start_date = request.args.get('start', datetime.now().replace(day=1).isoformat())
+        end_date = request.args.get('end', (datetime.now().replace(day=1) + timedelta(days=32)).replace(day=1).isoformat())
+    except:
+        start_date = datetime.now().replace(day=1).isoformat()
+        end_date = (datetime.now().replace(day=1) + timedelta(days=32)).replace(day=1).isoformat()
+    
+    # Collect user's tasks with completion data
+    user_tasks = [task for task in data['tasks'].values() if task.get('user_id') == user_id]
+    
+    calendar_data = []
+    for task in user_tasks:
+        for completed_date in task.get('completed_dates', []):
+            calendar_data.append({
+                'id': task['id'],
+                'title': task['title'],
+                'date': completed_date,
+                'xp': task.get('xp_reward', 0),
+                'coins': task.get('coin_reward', 0),
+                'recurring': task.get('recurring', False),
+                'frequency': task.get('frequency', 'daily')
+            })
+    
+    return jsonify({'tasks': calendar_data, 'start_date': start_date, 'end_date': end_date})
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000)]
