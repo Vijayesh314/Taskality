@@ -126,6 +126,7 @@ mountainhacks/
 │   ├── register.html           # Registration page with password validation
 │   ├── index.html              # Main dashboard
 │   └── profile.html            # User profile page
+│   └── game_mechanics.html     # Challenges and Quests
 ├── static/
 │   ├── css/
 │   │   └── style.css           # Styling including form validation feedback
