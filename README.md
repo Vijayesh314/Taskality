@@ -1,3 +1,5 @@
+# WE HAD TO USE A RANDOM YT VIDEO FOR THE SUBMISSION BECAUSE WE DIDN'T HAVE ENOUGH TIME TO UPLOAD OUR VIDEO. WE HAVE LINKED OUR ACTUAL VIDEO TO THE REPO BELOW.
+https://www.youtube.com/watch?v=1nXty70C7T4&feature=youtu.be
 # Daily Routine Gamifier
 
 Transform your mundane everyday tasks and habits into engaging mini-games! This app motivates users to complete daily routines by gamifying task completion with points, levels, achievements, and rewards.
