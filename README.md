@@ -72,6 +72,9 @@ mountainhacks/
 ├── app.py                 # Flask backend application
 ├── templates/
 │   └── index.html        # Main HTML template
+│   └── login.html        # Login page
+│   └── register.html     # Register new user
+│   └── profile.html      # Profile page
 ├── static/
 │   ├── css/
 │   │   └── style.css     # Stylesheet
